@@ -1,6 +1,7 @@
 /* Add this file to the frontend and load it with <script src="frontend-integration.js"></script>.
    Set API_BASE to your deployed backend URL before publishing. */
-const RHODANIKKY_API_BASE = const RHODANIKKY_API_BASE = 'https://onrender.com';
+const RHODANIKKY_API_BASE = 'https://onrender.com';
+
 
 
 const RHODANIKKY_WHATSAPP = '2348064797147';
