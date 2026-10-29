@@ -1,52 +1,65 @@
-/* Add this file to the frontend and load it with <script src="frontend-integration.js"></script>.
+/* Add this file to the frontend and load it with <script src="frontend-integration.js"></script>
    Set API_BASE to your deployed backend URL before publishing. */
 const RHODANIKKY_API_BASE = 'https://onrender.com';
 const RHODANIKKY_WHATSAPP = '2348064797147';
+
 const RhodanikkyAPI = {
   async request(path, options = {}) {
-    const headers = { ...(options.headers || {}) };
+    const headers = { ...options.headers || {} };
     if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
     const token = localStorage.getItem('rhodanikky_token');
     if (token) headers.Authorization = `Bearer ${token}`;
+
     const response = await fetch(`${RHODANIKKY_API_BASE}${path}`, { ...options, headers });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Request failed');
     return data;
   },
-  async products(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request(`/products${query ? `?${query}` : ''}`);
-  },
-  async register(name, email, password) {
-    const data = await this.request('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
-    localStorage.setItem('rhodanikky_token', data.token); return data.user;
-  },
+
+  // Auth Operations
   async login(email, password) {
-    const data = await this.request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    localStorage.setItem('rhodanikky_token', data.token); return data.user;
+    const data = await this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    if (data.token) localStorage.setItem('rhodanikky_token', data.token);
+    return data;
   },
-  logout() { localStorage.removeItem('rhodanikky_token'); },
-  // cartItems format: [{ productId: product._id, quantity: 2 }]
-  async placeOrder(form, cartItems) {
-    const data = await this.request('/orders', { method: 'POST', body: JSON.stringify({ ...form, items: cartItems }) });
-    // Opens WhatsApp with itemised order details; the customer must tap Send in WhatsApp.
-    window.open(data.whatsappUrl, '_blank', 'noopener,noreferrer');
-    return data.order;
+
+  async register(username, email, password) {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password })
+    });
   },
-  // Admin only: FormData fields name, description, category, price, stock, featured and repeated files named "images".
-  async addProduct(formData) {
-    return this.request('/products', { method: 'POST', body: formData });
+
+  // Product Inventory Operations
+  async getProducts(category = '') {
+    const query = category ? `?category=${encodeURIComponent(category)}` : '';
+    return this.request(`/products${query}`);
   },
-  async updateProduct(id, formData) {
-    return this.request(`/products/${encodeURIComponent(id)}`, { method: 'PATCH', body: formData });
+
+  async getProductDetails(id) {
+    return this.request(`/products/${id}`);
   },
-  async adminOrders(status = '') {
-    return this.request(`/orders/admin/all${status ? `?status=${encodeURIComponent(status)}` : ''}`);
+
+  // Order Handling & Pipeline
+  async createOrder(items, totalAmount) {
+    return this.request('/orders', {
+      method: 'POST',
+      body: JSON.stringify({ items, totalAmount })
+    });
   },
-  async updateOrderStatus(id, status, note = '') {
-    return this.request(`/orders/admin/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, note }) });
-  },
-  async updatePaymentStatus(id, paymentStatus, transferReference = '') {
-    return this.request(`/orders/admin/${encodeURIComponent(id)}/payment`, { method: 'PATCH', body: JSON.stringify({ paymentStatus, transferReference }) });
+
+  // WhatsApp Checkout String Formatter
+  buildWhatsAppLink(items, subtotal) {
+    let message = `Hello Rhodanikky Boutique! 💗\nI'd like to place an order:\n\n`;
+    items.forEach(item => {
+      message += `• ${item.name} (${item.category}) - Qty: ${item.quantity || 1} @ ₦${item.price.toLocaleString()}\n`;
+    });
+    message += `\n🛍 Subtotal: ₦${subtotal.toLocaleString()}\n`;
+    message += `📍 Please confirm stock availability and delivery options! ✨`;
+    
+    return `https://wa.me{RHODANIKKY_WHATSAPP}?text=${encodeURIComponent(message)}`;
   }
 };
